@@ -2,7 +2,7 @@ import cv2
 import os
 import numpy as np
 
-from keras import models, layers
+from keras import models, layers, callbacks
 from sklearn.model_selection import train_test_split
 
 
@@ -46,9 +46,13 @@ model.compile(optimizer='adam',
               loss='sparse_categorical_crossentropy',
               metrics=['accuracy'])
 
+earlystopping = callbacks.EarlyStopping(monitor="val_loss",
+                                        mode="min",
+                                        patience=5,
+                                        restore_best_weights=True)
 
 X_train, X_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
-history = model.fit(X_train, y_train, epochs=10, validation_data=(X_test, y_test))
+history = model.fit(X_train, y_train, epochs=50, validation_data=(X_test, y_test), callbacks=[earlystopping])
 
 test_loss, test_acc = model.evaluate(X_test, y_test, verbose=2)
 print(f'\nTest accuracy: {test_acc}')
