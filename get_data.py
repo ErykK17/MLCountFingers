@@ -15,12 +15,17 @@ def load_data(data_dir):
             img = cv2.imread(img_path)
             img = cv2.resize(img, (128, 128))
             images.append(img)
-            labels.append(label)
+            if label[:-1] == 'Left':
+                label_int = 0 + int(label[-1])
+            else:
+                label_int = 6 + int(label[-1])  
+            labels.append(label_int)
     images = np.array(images)
     labels = np.array(labels)
     return images, labels
 
-images, labels = load_data('/home/eryk/Pulpit/ML_IloscPalcow/Fingers/')
+images, labels = load_data('C:/Users/erykr/OneDrive/Pulpit/MLFingerCount/MLCountFingers/Fingers')
+
 images = images / 255.0
 
 
@@ -33,7 +38,7 @@ model = models.Sequential([
     layers.MaxPooling2D((2, 2)),
     layers.Flatten(),
     layers.Dense(64, activation='relu'),
-    layers.Dense(6, activation='softmax')  # Wyjścia: 0, 1, 2, 3, 4, 5
+    layers.Dense(12, activation='softmax')  # Wyjścia: 0, 1, 2, 3, 4, 5
 ])
 
 
@@ -43,9 +48,10 @@ model.compile(optimizer='adam',
 
 
 X_train, X_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
-
 history = model.fit(X_train, y_train, epochs=10, validation_data=(X_test, y_test))
 
 test_loss, test_acc = model.evaluate(X_test, y_test, verbose=2)
 print(f'\nTest accuracy: {test_acc}')
+
+model.save('model.keras')
 
