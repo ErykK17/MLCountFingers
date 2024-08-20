@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 from keras import models
 
-
 image = cv2.imread('TestImages/5T.jpg')
 
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -21,8 +20,8 @@ def predict_fingers(img):
     print(prediction)
     return np.argmax(prediction)
 
-img = cv2.resize(threshold, (128, 128))
-cv2.imshow("idk",img)
-cv2.waitKey(3000)
-cv2.destroyAllWindows()
-print(f'Predicted number of fingers: {predict_fingers(threshold)}')
+# img = cv2.resize(threshold, (128, 128))
+# cv2.imshow("idk",img)
+# cv2.waitKey(3000)
+# cv2.destroyAllWindows()
+# print(f'Predicted number of fingers: {predict_fingers(threshold)}')
