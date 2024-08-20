@@ -1,47 +1,110 @@
+import pickle
+
 import cv2
+import mediapipe as mp
 import numpy as np
-from keras import models
 
-model = models.load_model('modelthresholded.keras')
-
-def predict_fingers(img):
-    img = cv2.resize(img, (128, 128))
-    img = np.stack((img,) * 3, axis=-1) 
-    img = np.expand_dims(img, axis=0) / 255.0 
-    prediction = model.predict(img)
-    return np.argmax(prediction) 
+import time
 
 
-def process_frame(frame):
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) 
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0) 
-    _, threshold = cv2.threshold(blurred, 50, 255, cv2.THRESH_BINARY) 
-
-    contours, _ = cv2.findContours(threshold, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    if contours:
-        max_contour = max(contours, key=cv2.contourArea)
-        x, y, w, h = cv2.boundingRect(max_contour)
-        hand = threshold[y:y+h, x:x+w] 
-        fingers_count = predict_fingers(hand) 
-        cv2.putText(frame, f'Palce: {fingers_count}', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2) 
-    
-    return frame
+model_dict = pickle.load(open('./model.p', 'rb'))
+model = model_dict['model']
 
 cap = cv2.VideoCapture(0)
 
+mp_hands = mp.solutions.hands
+mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
+
+hands = mp_hands.Hands(static_image_mode=True, min_detection_confidence=0.3)
+
+labels_dict = {0: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6:'+', 7: '-'}
+
+current_value = 0
+current_mode = None
+
+
+current_character = None
+
+
 while True:
+
+    data_aux = []
+    x_ = []
+    y_ = []
+
     ret, frame = cap.read()
-    if not ret:
-        break
-    
 
-    processed_frame = process_frame(frame)
-    
+    H, W, _ = frame.shape
 
-    cv2.imshow("Finger Count", processed_frame)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+    results = hands.process(frame_rgb)
+    if results.multi_hand_landmarks:
+        for hand_landmarks in results.multi_hand_landmarks:
+            mp_drawing.draw_landmarks(
+                frame,  # image to draw
+                hand_landmarks,  # model output
+                mp_hands.HAND_CONNECTIONS,  # hand connections
+                mp_drawing_styles.get_default_hand_landmarks_style(),
+                mp_drawing_styles.get_default_hand_connections_style())
+
+        for hand_landmarks in results.multi_hand_landmarks:
+            for i in range(len(hand_landmarks.landmark)):
+                x = hand_landmarks.landmark[i].x
+                y = hand_landmarks.landmark[i].y
+
+                x_.append(x)
+                y_.append(y)
+
+            for i in range(len(hand_landmarks.landmark)):
+                x = hand_landmarks.landmark[i].x
+                y = hand_landmarks.landmark[i].y
+                data_aux.append(x - min(x_))
+                data_aux.append(y - min(y_))
+
+        x1 = int(min(x_) * W) - 10
+        y1 = int(min(y_) * H) - 10
+
+        x2 = int(max(x_) * W) - 10
+        y2 = int(max(y_) * H) - 10
+
+        if len(data_aux) == 42:
+            prediction = model.predict([np.asarray(data_aux)])
+
+        predicted_character = labels_dict[int(prediction[0])]
+
+
+        if predicted_character == '+':
+            current_mode = 'add'
+            current_character = predicted_character
+        
+        if predicted_character == '-':
+            current_mode = 'substract'
+            current_character = predicted_character
+
+        if predicted_character in ['1','2','3','4','5']:
+            if predicted_character != current_character:
+                if current_mode == 'add':
+                    current_value += int(predicted_character)
+                elif current_mode == 'substract':
+                    print(predicted_character)
+                    current_value -= int(predicted_character)
+                current_character = predicted_character
+                current_mode = None
+
+        if len(data_aux) == 42:
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 0), 4)
+            if predicted_character == '0':
+                    cv2.putText(frame, f'Wynik: {current_value}', (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (0, 0, 0), 3,
+                        cv2.LINE_AA)
+            else:
+                cv2.putText(frame, predicted_character, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (0, 0, 0), 3,
+                        cv2.LINE_AA)
+
+    cv2.imshow('frame', frame)
+    cv2.waitKey(1)
+
 
 cap.release()
 cv2.destroyAllWindows()

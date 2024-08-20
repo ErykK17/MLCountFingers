@@ -1,58 +1,50 @@
-import cv2
 import os
-import numpy as np
+import pickle
 
-from keras import models, layers, callbacks
-from sklearn.model_selection import train_test_split
-
-
-def load_data(data_dir):
-    labels = []
-    images = []
-    for label in os.listdir(data_dir):
-        for file in os.listdir(os.path.join(data_dir, label)):
-            img_path = os.path.join(data_dir, label, file)
-            img = cv2.imread(img_path)
-            img = cv2.resize(img, (128, 128))
-            images.append(img)
-            label_int = int(label[-1])
-            labels.append(label_int)
-    images = np.array(images)
-    labels = np.array(labels)
-    return images, labels
-
-images, labels = load_data('C:/Users/erykr/OneDrive/Pulpit/MLFingerCount/MLCountFingers/FingersThresholded')
-
-images = images / 255.0
+import mediapipe as mp
+import cv2
+import matplotlib.pyplot as plt
 
 
-model = models.Sequential([
-    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)),
-    layers.MaxPooling2D((2, 2)),
-    layers.Conv2D(64, (3, 3), activation='relu'),
-    layers.MaxPooling2D((2, 2)),
-    layers.Conv2D(64, (3, 3), activation='relu'),
-    layers.MaxPooling2D((2, 2)),
-    layers.Flatten(),
-    layers.Dense(64, activation='relu'),
-    layers.Dense(6, activation='softmax')  # Wyjścia: 0, 1, 2, 3, 4, 5
-])
+mp_hands = mp.solutions.hands
+mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
 
+hands = mp_hands.Hands(static_image_mode=True, min_detection_confidence=0.3)
 
-model.compile(optimizer='adam',
-              loss='sparse_categorical_crossentropy',
-              metrics=['accuracy'])
+DATA_DIR = 'MyFingers'
 
-earlystopping = callbacks.EarlyStopping(monitor="val_loss",
-                                        mode="min",
-                                        patience=5,
-                                        restore_best_weights=True)
+data = []
+labels = []
+for dir_ in os.listdir(DATA_DIR):
+    for img_path in os.listdir(os.path.join(DATA_DIR, dir_)):
+        data_aux = []
 
-X_train, X_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
-history = model.fit(X_train, y_train, epochs=20, validation_data=(X_test, y_test), callbacks=[earlystopping])
+        x_ = []
+        y_ = []
 
-test_loss, test_acc = model.evaluate(X_test, y_test, verbose=2)
-print(f'\nTest accuracy: {test_acc}')
+        img = cv2.imread(os.path.join(DATA_DIR, dir_, img_path))
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-model.save('model.keras')
+        results = hands.process(img_rgb)
+        if results.multi_hand_landmarks:
+            for hand_landmarks in results.multi_hand_landmarks:
+                for i in range(len(hand_landmarks.landmark)):
+                    x = hand_landmarks.landmark[i].x
+                    y = hand_landmarks.landmark[i].y
 
+                    x_.append(x)
+                    y_.append(y)
+
+                for i in range(len(hand_landmarks.landmark)):
+                    x = hand_landmarks.landmark[i].x
+                    y = hand_landmarks.landmark[i].y
+                    data_aux.append(x - min(x_))
+                    data_aux.append(y - min(y_))
+
+            data.append(data_aux)
+            labels.append(dir_)
+
+f = open('data.pickle', 'wb')
+pickle.dump({'data': data, 'labels': labels}, f)
+f.close()
