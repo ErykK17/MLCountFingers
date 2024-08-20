@@ -13,7 +13,6 @@ def predict_fingers(img):
 
 
 def process_frame(frame):
-    print("test")
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) 
     blurred = cv2.GaussianBlur(gray, (5, 5), 0) 
     _, threshold = cv2.threshold(blurred, 50, 255, cv2.THRESH_BINARY) 
